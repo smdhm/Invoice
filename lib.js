@@ -112,14 +112,43 @@
     };
   }
 
+  // Billing fields a client can have. Numeric overrides are null when the
+  // client should use the business-wide setting.
+  function newClient(id, name) {
+    return {
+      id,
+      name,
+      contactName: '',
+      email: '',
+      phone: '',
+      address: '',
+      taxId: '',
+      reference: '', // PO / reference number shown on invoices
+      rate: null,
+      paymentTermsDays: null,
+      taxRate: null,
+      invoiceNotes: '',
+    };
+  }
+
   function findOrCreateClient(state, name, makeId) {
     const trimmed = name.trim();
     let client = state.clients.find((c) => c.name.toLowerCase() === trimmed.toLowerCase());
     if (!client) {
-      client = { id: makeId(), name: trimmed, email: '', address: '', rate: null };
+      client = newClient(makeId(), trimmed);
       state.clients.push(client);
     }
     return client;
+  }
+
+  function hasValue(v) {
+    return v != null && v !== '';
+  }
+
+  // Client override if set, otherwise the business-wide setting.
+  function clientSetting(state, client, key) {
+    const v = client && client[key];
+    return Number(hasValue(v) ? v : state.settings[key]) || 0;
   }
 
   // Record the jobs worked during `week` and add them to that week's draft
@@ -153,12 +182,12 @@
           clientId: client.id,
           week,
           issueDate: today,
-          dueDate: addDays(today, Number(s.paymentTermsDays) || 0),
-          taxRate: Number(s.taxRate) || 0,
+          dueDate: addDays(today, clientSetting(state, client, 'paymentTermsDays')),
+          taxRate: clientSetting(state, client, 'taxRate'),
           status: 'draft',
           sentDate: null,
           paidDate: null,
-          notes: '',
+          notes: client.invoiceNotes || '',
           items: [],
         };
         s.nextInvoiceNumber += 1;
@@ -271,7 +300,7 @@
   const api = {
     toISODate, parseISODate, todayISO, addDays, weekday, weekStart, pendingWeeks,
     round2, lineAmount, invoiceTotals, formatMoney,
-    formatInvoiceNumber, invoiceStatus, emptyState, findOrCreateClient,
+    formatInvoiceNumber, invoiceStatus, emptyState, newClient, findOrCreateClient, clientSetting,
     applyCheckin, deleteJob, deleteInvoice, summarize,
     invoicesCsv, weeklyReminderIcs,
   };

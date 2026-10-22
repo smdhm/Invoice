@@ -116,3 +116,25 @@ test('weeklyReminderIcs builds a weekly recurring event', () => {
   assert.match(ics, /DTSTART:20261030T163000/); // next Friday after Saturday the 24th
   assert.ok(ics.includes('\r\n'));
 });
+
+test('client billing overrides apply to new invoices', () => {
+  const state = L.emptyState('2026-10-23');
+  const makeId = idGen();
+  const c = L.findOrCreateClient(state, 'Acme', makeId);
+  Object.assign(c, { paymentTermsDays: 30, taxRate: 8, invoiceNotes: 'PO required' });
+  L.applyCheckin(state, '2026-10-19', [
+    { client: 'Acme', description: 'x', quantity: 1, rate: 100 },
+    { client: 'Other', description: 'y', quantity: 1, rate: 100 },
+  ], '2026-10-23', makeId);
+  const [acme, other] = state.invoices;
+  assert.equal(acme.dueDate, '2026-11-22');
+  assert.equal(acme.taxRate, 8);
+  assert.equal(acme.notes, 'PO required');
+  assert.equal(other.dueDate, '2026-11-06');
+  assert.equal(other.taxRate, 0);
+  // Blank override (0 is a real value, '' / null fall back to settings).
+  c.taxRate = 0;
+  assert.equal(L.clientSetting(state, c, 'taxRate'), 0);
+  c.paymentTermsDays = '';
+  assert.equal(L.clientSetting(state, c, 'paymentTermsDays'), 14);
+});

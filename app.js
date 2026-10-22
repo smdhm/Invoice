@@ -20,7 +20,11 @@
       if (raw) {
         const saved = JSON.parse(raw);
         const fresh = L.emptyState(L.todayISO());
-        return Object.assign(fresh, saved, { settings: Object.assign(fresh.settings, saved.settings) });
+        return Object.assign(fresh, saved, {
+          settings: Object.assign(fresh.settings, saved.settings),
+          // Fill in billing fields added after the client was saved.
+          clients: (saved.clients || []).map((c) => Object.assign(L.newClient(c.id, c.name), c)),
+        });
       }
     } catch (e) {
       console.error('Could not load saved data', e);
@@ -208,15 +212,33 @@
   }
 
   function clients() {
-    let html = '<h2>Clients</h2><p class="muted">Clients are added automatically when you log a job. Set an email, address and rate so invoices are ready to send.</p>';
+    let html = '<h2>Clients</h2><p class="muted">Clients are added automatically when you log a job, or add one here. ' +
+      'Fill in their billing info so invoices are ready to send. Blank rate, terms and tax use your Settings.</p>' +
+      '<p><button class="primary" data-action="add-client">+ Add client</button></p>';
     if (!state.clients.length) return html + '<p class="muted">No clients yet.</p>';
+    const s = state.settings;
     for (const c of state.clients.slice().sort((a, b) => a.name.localeCompare(b.name))) {
-      html += '<form class="card" data-form="client" data-id="' + c.id + '"><div class="grid2">' +
-        '<label>Name<input name="name" required value="' + esc(c.name) + '"></label>' +
-        '<label>Email<input name="email" type="email" value="' + esc(c.email) + '"></label>' +
-        '<label>Default rate<input name="rate" type="number" step="0.01" min="0" placeholder="' + esc(state.settings.defaultRate) + '" value="' + esc(c.rate == null ? '' : c.rate) + '"></label>' +
+      const field = (name, label, attrs, placeholder) => '<label>' + label + '<input name="' + name + '" value="' +
+        esc(c[name] == null ? '' : c[name]) + '"' + (placeholder != null ? ' placeholder="' + esc(placeholder) + '"' : '') + ' ' + (attrs || '') + '></label>';
+      const invCount = state.invoices.filter((i) => i.clientId === c.id).length;
+      html += '<form class="card" data-form="client" data-id="' + c.id + '">' +
+        '<h3 style="margin-top:0">' + esc(c.name) + '</h3><div class="grid2">' +
+        field('name', 'Client / company name', 'required') +
+        field('contactName', 'Contact person') +
+        '</div><h4>Billing info</h4><div class="grid2">' +
+        field('email', 'Billing email', 'type="email"') +
+        field('phone', 'Phone', 'type="tel"') +
+        field('taxId', 'Tax ID / VAT / EIN') +
+        field('reference', 'PO / reference number') +
         '</div><label>Billing address<textarea name="address">' + esc(c.address) + '</textarea></label>' +
-        '<div class="row-actions"><button class="primary">Save</button></div></form>';
+        '<div class="grid2">' +
+        field('rate', 'Rate', 'type="number" step="0.01" min="0"', s.defaultRate) +
+        field('paymentTermsDays', 'Payment due (days)', 'type="number" min="0"', s.paymentTermsDays) +
+        field('taxRate', 'Tax rate %', 'type="number" step="0.01" min="0"', s.taxRate) +
+        '</div><label>Default note on their invoices<textarea name="invoiceNotes" placeholder="e.g. Please include the PO number with payment">' + esc(c.invoiceNotes) + '</textarea></label>' +
+        '<div class="row-actions">' +
+        (invCount ? '' : '<button type="button" class="danger" data-action="delete-client" data-id="' + c.id + '">Delete</button>') +
+        '<button class="primary">Save</button></div></form>';
     }
     return html;
   }
@@ -339,7 +361,11 @@
       '<tr><td>Due</td><td>' + esc(fmtDate(inv.dueDate)) + '</td></tr>' +
       '<tr><td>Period</td><td>' + esc(weekLabel(inv.week)) + '</td></tr></table></header>' +
       '<div style="margin-bottom:20px"><div class="muted">Bill to</div><strong>' + esc(c.name) + '</strong>' +
-      '<div class="pre">' + esc(c.address) + '</div>' + (c.email ? '<div>' + esc(c.email) + '</div>' : '') + '</div>' +
+      (c.contactName ? '<div>Attn: ' + esc(c.contactName) + '</div>' : '') +
+      '<div class="pre">' + esc(c.address) + '</div>' + (c.email ? '<div>' + esc(c.email) + '</div>' : '') +
+      (c.phone ? '<div>' + esc(c.phone) + '</div>' : '') +
+      (c.taxId ? '<div>Tax ID: ' + esc(c.taxId) + '</div>' : '') +
+      (c.reference ? '<div>PO / Ref: ' + esc(c.reference) + '</div>' : '') + '</div>' +
       '<table><thead><tr><th>Date</th><th>Description</th><th class="num">Qty</th><th class="num">Rate</th><th class="num">Amount</th></tr></thead><tbody>' +
       sorted.map((it) => '<tr><td>' + esc(fmtDate(it.date)) + '</td><td>' + esc(it.description) + '</td>' +
         '<td class="num">' + esc(it.unit === 'flat' ? '' : it.quantity + ' ' + it.unit) + '</td>' +
@@ -387,7 +413,8 @@
     const c = client(inv.clientId);
     const t = L.invoiceTotals(inv);
     const lines = inv.items.map((it) => '- ' + fmtDate(it.date) + ': ' + it.description + ' — ' + money(L.lineAmount(it)));
-    const body = 'Hi ' + c.name + ',\n\nPlease find invoice ' + inv.number + ' for the week of ' + weekLabel(inv.week) + '.\n\n' +
+    const body = 'Hi ' + (c.contactName || c.name) + ',\n\nPlease find invoice ' + inv.number + ' for the week of ' + weekLabel(inv.week) +
+      (c.reference ? ' (PO / Ref: ' + c.reference + ')' : '') + '.\n\n' +
       lines.join('\n') + '\n\nTotal due: ' + money(t.total) + ' by ' + fmtDate(inv.dueDate) + '.\n' +
       (s.paymentInstructions ? '\nPayment details:\n' + s.paymentInstructions + '\n' : '') +
       '\nThanks,\n' + (s.businessName || '');
@@ -441,7 +468,7 @@
       inv.status = 'sent';
       inv.sentDate = today;
       inv.issueDate = today;
-      inv.dueDate = L.addDays(today, Number(state.settings.paymentTermsDays) || 0);
+      inv.dueDate = L.addDays(today, L.clientSetting(state, client(inv.clientId), 'paymentTermsDays'));
       save(); render(); refreshInvoice();
     },
     'mark-paid': (el) => {
@@ -471,6 +498,18 @@
     },
     'email-invoice': (el) => emailInvoice(state.invoices.find((i) => i.id === el.dataset.id)),
     print: () => window.print(),
+    'add-client': () => {
+      const name = prompt('Client / company name:');
+      if (!name || !name.trim()) return;
+      L.findOrCreateClient(state, name, makeId);
+      save(); render();
+    },
+    'delete-client': (el) => {
+      if (!confirm('Delete this client?')) return;
+      state.clients = state.clients.filter((c) => c.id !== el.dataset.id);
+      state.jobs = state.jobs.filter((j) => j.clientId !== el.dataset.id || j.invoiceId);
+      save(); render();
+    },
     'delete-job': (el) => {
       if (!confirm('Delete this job?')) return;
       L.deleteJob(state, el.dataset.id);
@@ -552,10 +591,18 @@
       save(); tab = 'dashboard'; render();
     } else if (form.dataset.form === 'client') {
       const c = state.clients.find((x) => x.id === form.dataset.id);
+      for (const k of ['contactName', 'email', 'phone', 'taxId', 'reference']) c[k] = data[k].trim();
+      for (const k of ['rate', 'paymentTermsDays', 'taxRate']) c[k] = data[k] === '' ? null : Number(data[k]);
+      const previousNotes = c.invoiceNotes;
       c.name = data.name.trim() || c.name;
-      c.email = data.email.trim();
       c.address = data.address;
-      c.rate = data.rate === '' ? null : Number(data.rate);
+      c.invoiceNotes = data.invoiceNotes;
+      // Keep unsent drafts in step with the client's tax rate and note.
+      for (const inv of state.invoices) {
+        if (inv.clientId !== c.id || inv.status !== 'draft') continue;
+        inv.taxRate = L.clientSetting(state, c, 'taxRate');
+        if (!inv.notes || inv.notes === previousNotes) inv.notes = c.invoiceNotes;
+      }
       save(); render();
     }
   });

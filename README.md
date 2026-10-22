@@ -19,6 +19,9 @@ in your browser.
    asks about each one in turn, starting with the oldest.
    - Add each job: client, what you did, date, quantity (hours/days/flat/items) and rate.
    - New clients are created automatically, and their saved rate fills in next time.
+   - On the **Clients** tab, fill in each client's billing info: contact person, billing email,
+     phone, address, tax ID, PO/reference number, and their own rate, payment terms, tax rate
+     and default invoice note. Anything left blank uses your Settings.
    - If you didn't work that week, choose **"I didn't work this week"**.
 4. **Invoices are created for you.** You get one draft invoice per client per week,
    numbered in order (`INV-0001`, `INV-0002`, …).
