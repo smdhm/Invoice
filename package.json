@@ -1,0 +1,10 @@
+{
+  "name": "weekly-invoice-tracker",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Asks every week what jobs you worked on, then creates and tracks your invoices.",
+  "scripts": {
+    "test": "node --test",
+    "start": "python3 -m http.server 8000"
+  }
+}

@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Weekly Invoices</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar no-print">
+    <h1>Weekly Invoices</h1>
+    <nav id="tabs">
+      <button data-tab="dashboard">Dashboard</button>
+      <button data-tab="invoices">Invoices</button>
+      <button data-tab="jobs">Jobs</button>
+      <button data-tab="clients">Clients</button>
+      <button data-tab="settings">Settings</button>
+    </nav>
+  </header>
+
+  <main id="view" class="no-print"></main>
+
+  <dialog id="checkin-dialog" class="no-print">
+    <form id="checkin-form" method="dialog"></form>
+  </dialog>
+
+  <dialog id="invoice-dialog">
+    <div class="dialog-actions no-print" id="invoice-actions"></div>
+    <div id="print-area"></div>
+  </dialog>
+
+  <datalist id="client-names"></datalist>
+
+  <script src="lib.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,3 @@
+node_modules/
+*.ics
+invoice-tracker-backup-*.json
